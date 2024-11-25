@@ -1,70 +1,73 @@
-import React, { useState } from "react";
-import "./App.css";
+import React, { useState, useEffect } from 'react';
+import TodoList from './components/TodoList';
+import './App.css';
+import api from './services/api';
 
 function App() {
-  const [tarefas, setTarefas] = useState([]);
-  const [novaTarefa, setNovaTarefa] = useState("");
-  const [editando, setEditando] = useState(null);
-  const [tarefaEditada, setTarefaEditada] = useState("");
+  const [tasks, setTasks] = useState([]);
+  const [newTask, setNewTask] = useState('');
+  const [showPending, setShowPending] = useState(false);
 
-  const adicionarTarefa = () => {
-    if (novaTarefa.trim()) {
-      setTarefas([...tarefas, novaTarefa]);
-      setNovaTarefa("");
+  useEffect(() => {
+    api.get('/tasks').then((response) => {
+      setTasks(response.data);
+    });
+  }, []);
+
+  const addTask = () => {
+    if (newTask.trim()) {
+      api.post('/tasks', { title: newTask }).then((response) => {
+        setTasks([...tasks, response.data]);
+        setNewTask('');
+      });
     }
   };
 
-  const excluirTarefa = (indice) => {
-    setTarefas(tarefas.filter((_, i) => i !== indice));
+  const deleteTask = (id) => {
+    api.delete(`/tasks/${id}`).then(() => {
+      setTasks(tasks.filter((task) => task._id !== id));
+    });
   };
 
-  const iniciarEdicao = (indice) => {
-    setEditando(indice);
-    setTarefaEditada(tarefas[indice]);
+  const toggleTask = (id, completed) => {
+    api.put(`/tasks/${id}`, { completed: !completed }).then((response) => {
+      setTasks(tasks.map((task) => (task._id === id ? response.data : task)));
+    });
   };
 
-  const salvarEdicao = (indice) => {
-    const tarefasAtualizadas = tarefas.map((tarefa, i) =>
-      i === indice ? tarefaEditada : tarefa
-    );
-    setTarefas(tarefasAtualizadas);
-    setEditando(null);
+  const editTask = (id, title) => {
+    api.put(`/tasks/${id}`, { title }).then((response) => {
+      setTasks(tasks.map((task) => (task._id === id ? response.data : task)));
+    });
   };
+
+  const filteredTasks = showPending
+    ? tasks.filter((task) => !task.completed)
+    : tasks;
 
   return (
     <div className="app">
-      <h1>TODO LIST</h1>
+      <h1>Lista de Tarefas</h1>
       <div className="input-container">
         <input
           type="text"
           placeholder="Adicionar tarefa..."
-          value={novaTarefa}
-          onChange={(e) => setNovaTarefa(e.target.value)}
+          value={newTask}
+          onChange={(e) => setNewTask(e.target.value)}
         />
-        <button onClick={adicionarTarefa}>Adicionar</button>
+        <button onClick={addTask}>Adicionar</button>
       </div>
-      <ul className="lista-tarefas">
-        {tarefas.map((tarefa, indice) => (
-          <li key={indice} className="item-tarefa">
-            {editando === indice ? (
-              <>
-                <input
-                  type="text"
-                  value={tarefaEditada}
-                  onChange={(e) => setTarefaEditada(e.target.value)}
-                />
-                <button onClick={() => salvarEdicao(indice)}>Salvar</button>
-              </>
-            ) : (
-              <>
-                <span>{tarefa}</span>
-                <button onClick={() => excluirTarefa(indice)}>Excluir</button>
-                <button onClick={() => iniciarEdicao(indice)}>Editar</button>
-              </>
-            )}
-          </li>
-        ))}
-      </ul>
+      <div className="filter-container">
+        <button onClick={() => setShowPending(!showPending)}>
+          {showPending ? 'Mostrar Todas' : 'Mostrar Pendentes'}
+        </button>
+      </div>
+      <TodoList
+        tasks={filteredTasks}
+        onDelete={deleteTask}
+        onToggle={toggleTask}
+        onEdit={editTask}
+      />
     </div>
   );
 }
